@@ -193,6 +193,49 @@ function staticHtmlGenerator() {
         fs.writeFileSync(pagePath, pageHtml, 'utf-8');
         console.log(`[Static Generator] 已成功為功能頁《${page.title}》生成靜態 HTML 檔：/${page.id}.html`);
       });
+      
+      // 自動處理所有根目錄的實體 HTML 檔案（未包含在 customPages 中的）
+      const customPageIds = new Set(customPages.map(p => p.id));
+      const customPageUrls = new Set(customPages.map(p => p.url));
+      const articleIds = new Set(travelArticles.map(a => a.id));
+      
+      const rootFiles = fs.readdirSync(__dirname);
+      rootFiles.forEach(file => {
+        if (!file.endsWith('.html') || file === 'index.html') return;
+        const fileId = file.replace('.html', '');
+        
+        // 跳過已處理的 customPages 和 articles
+        if (customPageIds.has(fileId) || customPageUrls.has(file)) return;
+        
+        const physicalPath = path.resolve(__dirname, file);
+        if (!fs.existsSync(physicalPath)) return;
+        
+        const pagePath = path.join(distDir, file);
+        if (fs.existsSync(pagePath)) return; // 已經被其他邏輯處理
+        
+        const physicalContent = fs.readFileSync(physicalPath, 'utf-8');
+        const title = `${fileId}｜${metadataName}`;
+        const description = metadataDescription;
+        const canonicalUrl = `https://golightly.fun/${fileId}.html`;
+        const keywords = `${fileId}, 自由行, 旅遊攻略, 均在路上`;
+        
+        const jsonLd = {
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": title,
+          "description": description,
+          "publisher": {
+            "@type": "Organization",
+            "name": metadataName,
+            "url": "https://golightly.fun"
+          },
+          "url": canonicalUrl
+        };
+        
+        const optimizedHtml = generatePageHtml(physicalContent, title, description, '', canonicalUrl, keywords, jsonLd);
+        fs.writeFileSync(pagePath, optimizedHtml, 'utf-8');
+        console.log(`[Static Generator] 已自動處理根目錄實體 HTML 檔：《${file}》`);
+      });
     }
   };
 }
